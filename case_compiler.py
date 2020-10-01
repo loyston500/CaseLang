@@ -34,6 +34,7 @@ class Compiler:
     def __init__(self, ARG, is_file=True):
         self.read_file_pattern_old = r'[^\s"]+|"[^"]*"'
         self.read_file_pattern = r"((f|u|b)?\"[^\"]*\")|((f|u|b)?\'[^\']*\')|(\([\s\S]*\)(?=[^\)]))|(\([\s\S]*)|(\w*)"
+        self.array_tokens = {"LIST":('[',']'),"SET":('{','}'),"DICT":('{','}')}
         if is_file:
             self.file_name = ARG
             with open(ARG) as opened_file:
@@ -54,7 +55,6 @@ class Compiler:
         return "\n".join(result)
 
     def parser(self, line):
-        print(line)
         token = []
         line_length = len(line)
         i = 0
@@ -196,11 +196,38 @@ class Compiler:
                     token.append(f"({line[i+1]} for _ in range({line[i-1]}))")
                     i += 2
 
+                elif line[i] in ("SET","LIST","DICT"):
+                    pre,suf=self.array_tokens[line[i]]
+                    if i==0:
+                        token.append(f"{pre}{', '.join(self.parser(line[i+1:]))}{suf}")
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
+                elif line[i] in ("$"):
+                    if i==0:
+                        token.append(f"[{': '.join(self.parser(line[i+1:]))}]")
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
                 elif line[i].startswith("(") and line[i].endswith(")"):
-                    token.append(
-                        f"({', '.join(self.parser(self.tokenizer(line[i][1:-1])))})"
-                    )
-                    i += 1
+                    inner = line[i][1:-1]
+                    if inner.startswith(":"):
+                        inner=inner[1:]
+                        if i != 0:
+                            previous_token=token[-1]
+                            token = token[:-1]
+                            token.append(f"{previous_token}[{': '.join(self.parser(self.tokenizer(inner)))}]")
+                            i += 1
+                        else:
+                            raise Exception("invalid syntax")
+                    else:
+                        token.append(
+                            f"({', '.join(self.parser(self.tokenizer(inner)))})"
+                        )
+                        i += 1
+
 
                 else:
                     token.append(line[i])
@@ -217,8 +244,7 @@ class Compiler:
             try:
                 line = [input("~> ")]
                 for s in self.read(line):
-                    k = ",".join(self.parser(s[0]))
-                    print(k)
+                    k = ", ".join(self.parser(s[0]))
                     try:
                         print(eval(k))
                     except SyntaxError:
