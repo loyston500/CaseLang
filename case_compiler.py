@@ -33,7 +33,7 @@ if impl not in ("PyPy"):
 class Compiler:
     def __init__(self, ARG, is_file=True):
         self.read_file_pattern_old = r'[^\s"]+|"[^"]*"'
-        self.read_file_pattern = r'((f|u|b)?\"[^\"]*\")|((f|u|b)?\'[^\']*\')|(\([\s\S]*\)(?=[^\)]))|(\([\s\S]*)|(\w*)'
+        self.read_file_pattern = r"((f|u|b)?\"[^\"]*\")|((f|u|b)?\'[^\']*\')|(\([\s\S]*\)(?=[^\)]))|(\([\s\S]*)|(\w*)"
         if is_file:
             self.file_name = ARG
             with open(ARG) as opened_file:
@@ -62,133 +62,145 @@ class Compiler:
             while i < line_length:
                 if line[i] == "import":
                     token = [f"import {', '.join(line[:i])}"]
-                    i+=2
-                
-                elif line[i] in ("+","-","/","%","<",">"):
-                    token=[f"{(' '+line[i]+' ').join(token)}"]
-                    i+=1
+                    i += 2
 
-                elif line[i]=="is":
-                    token=[f"{', '.join(token)} == {line[i+1]}"]
-                    i+=2
+                elif line[i] in ("+", "-", "/", "%", "<", ">"):
+                    token = [f"{(' '+line[i]+' ').join(token)}"]
+                    i += 1
 
+                elif line[i] == "is":
+                    token = [f"{', '.join(token)} == {line[i+1]}"]
+                    i += 2
 
                 # experimental
-                elif line[i]=="!":
-                    token=token[:-1]
-                    token.append(f"{', '.join(self.parser(self.tokenizer(line[i-1])))}()")
-                    i+=1
+                elif line[i] == "!":
+                    token = token[:-1]
+                    token.append(
+                        f"{', '.join(self.parser(self.tokenizer(line[i-1])))}()"
+                    )
+                    i += 1
 
-                elif line[i]=="of" or line[i]==":":
-                    next_tokens=line[i+1:]
+                elif line[i] == "of" or line[i] == ":":
+                    next_tokens = line[i + 1 :]
 
                     if "does" in next_tokens:
-                        if next_tokens[-1]=="does":
-                            position=next_tokens.index("does")
-                            token=[f"def {', '.join(token)}({', '.join(self.parser(next_tokens[:position]))}):"]
+                        if next_tokens[-1] == "does":
+                            position = next_tokens.index("does")
+                            token = [
+                                f"def {', '.join(token)}({', '.join(self.parser(next_tokens[:position]))}):"
+                            ]
                             break
                         else:
-                            token=[f"{', '.join(token)}({', '.join(self.parser(next_tokens))})"]
+                            token = [
+                                f"{', '.join(token)}({', '.join(self.parser(next_tokens))})"
+                            ]
                             break
                     else:
-                        token=[f"{', '.join(token)}({', '.join(self.parser(next_tokens))})"]
+                        token = [
+                            f"{', '.join(token)}({', '.join(self.parser(next_tokens))})"
+                        ]
                         break
 
-
-
-                elif line[i]=="be" or line[i]=="=":
-                    token=[f"{', '.join(token)} = {', '.join(self.parser(line[i+1:]))}"]
+                elif line[i] == "be" or line[i] == "=":
+                    token = [
+                        f"{', '.join(token)} = {', '.join(self.parser(line[i+1:]))}"
+                    ]
                     break
 
-                elif line[i]==";":
-                    token=[f"({', '.join(token)})"]
-                    i+=1
+                elif line[i] == ";":
+                    token = [f"({', '.join(token)})"]
+                    i += 1
 
-
-
-                elif line[i]=="does":
-                    next_tokens=line[i+1:]
+                elif line[i] == "does":
+                    next_tokens = line[i + 1 :]
 
                     if "from" in next_tokens:
-                        first_from_position=next_tokens.index("from")
+                        first_from_position = next_tokens.index("from")
 
                         if "does" in next_tokens[:first_from_position]:
-                            position=self.rindex(next_tokens,"from")
+                            position = self.rindex(next_tokens, "from")
                         else:
-                            position=next_tokens.index("from")
+                            position = next_tokens.index("from")
 
-                        tokens_before_from=next_tokens[:position]
-                        tokens_after_from=next_tokens[position+1:]
-                        token=[f"{','.join(token)}{' = ' if i!=0 else ''}(lambda {','.join(self.parser(tokens_after_from))}: {', '.join(self.parser(tokens_before_from))})"]
+                        tokens_before_from = next_tokens[:position]
+                        tokens_after_from = next_tokens[position + 1 :]
+                        token = [
+                            f"{','.join(token)}{' = ' if i!=0 else ''}(lambda {','.join(self.parser(tokens_after_from))}: {', '.join(self.parser(tokens_before_from))})"
+                        ]
                     else:
-                        token=[f"{','.join(token)}{' = ' if i!=0 else ''}(lambda: {','.join(self.parser(next_tokens))})"]
+                        token = [
+                            f"{','.join(token)}{' = ' if i!=0 else ''}(lambda: {','.join(self.parser(next_tokens))})"
+                        ]
                     break
-                
-                elif line[i]=="while":
-                    if i==0:
-                        token=[f"while ({', '.join(self.parser(line[i+1:]))}):"]
-                        break
-                
-                elif line[i]=="then":
-                    next_tokens=line[i+1:]
 
-                    if next_tokens==[]:
-                        token=[f"if ({', '.join(self.parser(line[:i]))}):"]
+                elif line[i] == "while":
+                    if i == 0:
+                        token = [f"while ({', '.join(self.parser(line[i+1:]))}):"]
+                        break
+
+                elif line[i] == "then":
+                    next_tokens = line[i + 1 :]
+
+                    if next_tokens == []:
+                        token = [f"if ({', '.join(self.parser(line[:i]))}):"]
                         break
 
                     if "else" in next_tokens:
-                        first_else_position=next_tokens.index("else")
+                        first_else_position = next_tokens.index("else")
 
                         if "then" in next_tokens[:first_else_position]:
-                            position=self.rindex(next_tokens,"else")
+                            position = self.rindex(next_tokens, "else")
                         else:
-                            position=next_tokens.index("else")
+                            position = next_tokens.index("else")
 
-                        tokens_before_else=next_tokens[:position]
-                        tokens_after_else=next_tokens[position+1:]
-                        token=[f"(({', '.join(self.parser(tokens_before_else))}) if ({', '.join(token)}) else ({', '.join(self.parser(tokens_after_else))}))"]
-                    
+                        tokens_before_else = next_tokens[:position]
+                        tokens_after_else = next_tokens[position + 1 :]
+                        token = [
+                            f"(({', '.join(self.parser(tokens_before_else))}) if ({', '.join(token)}) else ({', '.join(self.parser(tokens_after_else))}))"
+                        ]
+
                     else:
-                        token=[f"(({', '.join(self.parser(line[i+1:]))}) if ({', '.join(token)}) else None)"]
+                        token = [
+                            f"(({', '.join(self.parser(line[i+1:]))}) if ({', '.join(token)}) else None)"
+                        ]
                     break
 
-
-
-                elif line[i]=="if":
-                    next_tokens=line[i+1:]
-                    if i==0:
-                        token=[f"if ({', '.join(self.parser(next_tokens))}):"]
+                elif line[i] == "if":
+                    next_tokens = line[i + 1 :]
+                    if i == 0:
+                        token = [f"if ({', '.join(self.parser(next_tokens))}):"]
                         break
 
                     if "else" in next_tokens:
-                        first_else_position=next_tokens.index("else")
-                        
-                        if "if" in next_tokens[:first_else_position]:
-                            position=self.rindex(next_tokens,"else")
-                        else:
-                            position=next_tokens.index("else")
+                        first_else_position = next_tokens.index("else")
 
-                        tokens_before_else=next_tokens[:position]
-                        tokens_after_else=next_tokens[position+1:]
-                        token=[f"({', '.join(token)}) if ({', '.join(self.parser(tokens_before_else))}) else ({', '.join(self.parser(tokens_after_else))})"]
-                    
+                        if "if" in next_tokens[:first_else_position]:
+                            position = self.rindex(next_tokens, "else")
+                        else:
+                            position = next_tokens.index("else")
+
+                        tokens_before_else = next_tokens[:position]
+                        tokens_after_else = next_tokens[position + 1 :]
+                        token = [
+                            f"({', '.join(token)}) if ({', '.join(self.parser(tokens_before_else))}) else ({', '.join(self.parser(tokens_after_else))})"
+                        ]
+
                     else:
-                        token=[f"({', '.join(token)}) if ({', '.join(self.parser(line[i+1:]))}) else None"]
+                        token = [
+                            f"({', '.join(token)}) if ({', '.join(self.parser(line[i+1:]))}) else None"
+                        ]
                     break
 
-
-
-                elif line[i]=="times":
-                    token=token[:-1]
+                elif line[i] == "times":
+                    token = token[:-1]
                     token.append(f"({line[i+1]} for _ in range({line[i-1]}))")
-                    i+=2
-
-
+                    i += 2
 
                 elif line[i].startswith("(") and line[i].endswith(")"):
-                    token.append(f"({', '.join(self.parser(self.tokenizer(line[i][1:-1])))})")
-                    i+=1
-
+                    token.append(
+                        f"({', '.join(self.parser(self.tokenizer(line[i][1:-1])))})"
+                    )
+                    i += 1
 
                 else:
                     token.append(line[i])
@@ -223,28 +235,28 @@ class Compiler:
                 i += 1
         return line[i:], i
 
-    def rindex(self,lst,ele):
+    def rindex(self, lst, ele):
         return len(lst) - lst[::-1].index(ele) - 1
 
-    def paren(self,t):
-        l=len(t)
-        i=0
-        c=0
-        while i<l:
-            if t[i]==")" and c==0:
+    def paren(self, t):
+        l = len(t)
+        i = 0
+        c = 0
+        while i < l:
+            if t[i] == ")" and c == 0:
                 return i
-            if t[i]=="(":
-                c+=1
-            if t[i]==")":
-                c-=1
-            i+=1
+            if t[i] == "(":
+                c += 1
+            if t[i] == ")":
+                c -= 1
+            i += 1
         return i
 
     def tokenizer(self, line):
-        result=[]
-        for token in re.split(self.read_file_pattern,line.strip()):
-            if not (token==None or token.split()==[]):
-                    result.append(token)
+        result = []
+        for token in re.split(self.read_file_pattern, line.strip()):
+            if not (token == None or token.split() == []):
+                result.append(token)
         return result
 
     def read_old(self, lines):
