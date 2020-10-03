@@ -35,6 +35,7 @@ class Compiler:
         self.read_file_pattern_old = r'[^\s"]+|"[^"]*"'
         self.read_file_pattern = r"((f|u|b)?\"[^\"]*\")|((f|u|b)?\'[^\']*\')|(\([\s\S]*\)(?=[^\)]))|(\([\s\S]*)|(\w*)"
         self.array_tokens = {"LIST":('[',']'),"SET":('{','}'),"DICT":('{','}')}
+        self.keeps = {}
         if is_file:
             self.file_name = ARG
             with open(ARG) as opened_file:
@@ -51,7 +52,7 @@ class Compiler:
             try:
                 result.append((" " * ind) + (",".join(self.parser(line))))
             except Exception as err:
-                raise Exception(f"Error at line {line_number}: {err}")
+                raise Exception(f"Error at line {line_number+1}, because of {err}")
         return "\n".join(result)
 
     def parser(self, line):
@@ -61,10 +62,10 @@ class Compiler:
         try:
             while i < line_length:
                 if line[i] == "import":
-                    token = [f"import {', '.join(line[:i])}"]
-                    i += 2
-
-                elif line[i] in ("+", "-", "/", "%", "<", ">"):
+                    token = [f"import {', '.join(self.parser(line[i+1:]))}"]
+                    break
+                
+                elif line[i] in ("+", "*" , "-", "/", "**" , "%", "<", ">"):
                     token = [f"{(' '+line[i]+' ').join(token)}"]
                     i += 1
 
@@ -138,6 +139,32 @@ class Compiler:
                         token = [f"while ({', '.join(self.parser(line[i+1:]))}):"]
                         break
 
+                elif line[i]=="for":
+                    if i == 0:
+                        token = [f"for {', '.join(self.parser(line[i+1:]))}:"]
+                        break
+                    else:
+                        token =  [f"{', '.join(token)} for {', '.join(self.parser(line[i+1:]))}"]
+                        break
+
+                elif line[i]=="in":
+                    token = [f"{', '.join(token)} in {', '.join(self.parser(line[i+1:]))}"]
+                    break
+
+                elif line[i] in ("continue","break"):
+                    if line_length==1:
+                        token.append(line[i])
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
+                elif line[i]=="return":
+                    if i==0:
+                        token=[f"return {', '.join(self.parser(line[i+1:]))}"]
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
                 elif line[i] == "then":
                     next_tokens = line[i + 1 :]
 
@@ -191,6 +218,61 @@ class Compiler:
                         ]
                     break
 
+                elif line[i] == "switch":
+                    if i==0:
+                        self.switch_token=self.parser(line[i+1:])
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
+                elif line[i] == "case":
+                    if i==0:
+                        token=[f"if ({', '.join(self.switch_token)}) == ({', '.join(self.parser(line[i+1:]))}):"]
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
+                elif line[i] == "elcase":
+                    if i==0:
+                        token=[f"elif ({', '.join(self.switch_token)}) == ({', '.join(self.parser(line[i+1:]))}):"]
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
+                elif line[i] == "keep":
+                    if i==0:
+                        if "as" in line:
+                            next_tokens=line[i+1:]
+                            as_position=self.rindex(next_tokens,"as")
+                            name=', '.join(self.parser(next_tokens[:as_position]))
+                            if name.isidentifier():
+                                self.keeps[name] = ', '.join(self.parser(next_tokens[as_position+1:]))
+                                token=[]
+                                break
+                            else:
+                                raise Exception(f"'{name}' is an invalid name.")
+                        else:
+                            raise Exception("'as' not found.")
+                    else:
+                        raise Exception("invalid syntax.")
+
+
+                            
+
+                elif line[i] == "elif":
+                    if i==0:
+                        token=[f"elif ({', '.join(self.parser(line[i+1:]))}):"]
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+                
+                elif line[i]=="else":
+                    if line_length==1:
+                        token=["else:"]
+                        break
+                    else:
+                        raise Exception("invalid syntax.")
+
                 elif line[i] == "times":
                     token = token[:-1]
                     token.append(f"({line[i+1]} for _ in range({line[i-1]}))")
@@ -202,14 +284,22 @@ class Compiler:
                         token.append(f"{pre}{', '.join(self.parser(line[i+1:]))}{suf}")
                         break
                     else:
-                        raise Exception("invalid syntax.")
+                        raise Exception("declaration outside parenthesis.")
 
-                elif line[i] in ("$"):
-                    if i==0:
-                        token.append(f"[{': '.join(self.parser(line[i+1:]))}]")
-                        break
-                    else:
+                elif line[i] in (".","\\"):
+                    previous_token=token[-1]
+                    token = token[:-1]
+                    try:
+                        next_token=', '.join(self.parser([line[i+1]]))
+                        if next_token.isidentifier():
+                            token.append(f"{previous_token}.{next_token}")
+                            i += 2
+                        else:
+                            raise Exception("invalid attribute name.")
+                    except IndexError:
                         raise Exception("invalid syntax.")
+                        
+
 
                 elif line[i].startswith("(") and line[i].endswith(")"):
                     inner = line[i][1:-1]
@@ -221,22 +311,33 @@ class Compiler:
                             token.append(f"{previous_token}[{': '.join(self.parser(self.tokenizer(inner)))}]")
                             i += 1
                         else:
-                            raise Exception("invalid syntax")
+                            raise Exception("invalid syntax.")
+                    if inner.startswith("#"):
+                        i+=1
                     else:
                         token.append(
                             f"({', '.join(self.parser(self.tokenizer(inner)))})"
                         )
                         i += 1
 
+                elif line[i] in self.keeps:
+                    token.append(self.keeps[line[i]])
+                    i += 1
+
 
                 else:
-                    token.append(line[i])
-                    i += 1
+                    if line[i].isidentifier() or line[i].isdigit():
+                        token.append(line[i])
+                        i+=1
+                    else:
+                        raise Exception(f"wierd char '{line[i]}' lol.")
             return token
         except IndexError:
             raise Exception(f"No token after '{line[i]}'")
         except RecursionError:
             raise Exception("Unknown compiler error")
+        except Exception as err:
+            raise Exception(f"token '{line[i]}', with token number {i+1}. This is because of {err}")
 
     def interpreter(self):
         print(f"Case v0.0.2 running on python {sys.version}]")
